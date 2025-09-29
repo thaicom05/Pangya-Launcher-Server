@@ -1,0 +1,158 @@
+﻿<Window x:Class="PangyaLauncherServer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pangya - Launcher Server"
+        Height="715" Width="1175"
+        Background="#1E1E2F"
+        WindowStartupLocation="CenterScreen" Icon="/icon.ico">
+
+    <Grid Margin="2,68,5,82">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="4.04"/>
+            <RowDefinition Height="45.223"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Título -->
+        <TextBlock Text="Pangya Server Manager"
+                   FontSize="22"
+                   Foreground="White"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,20" Grid.RowSpan="2"/>
+
+        <!-- Cards dos Servidores -->
+        <WrapPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,45,0,0" Grid.RowSpan="3">
+            <!-- Cada Border é um servidor -->
+            <Border Background="#2D2D40" CornerRadius="12" Padding="20" Margin="10" Width="200" Height="130">
+                <StackPanel>
+                    <TextBlock Text="Auth Server" FontSize="16" Foreground="White" Margin="0,0,0,10"/>
+                    <ToggleButton x:Name="AuthToggle" Content="Start / Stop"
+                                  Width="120" Height="35"
+                                  Background="#3A8DFF" Foreground="White"
+                                  Click="ServerToggle_Click"/>
+                    <TextBlock x:Name="AuthStatus" Text="Status: Offline"
+                               Foreground="Gray" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Repetir para Login, Game, Rank, Messenger -->
+            <Border Background="#2D2D40" CornerRadius="12" Padding="20" Margin="10" Width="200" Height="130">
+                <StackPanel>
+                    <TextBlock Text="Login Server" FontSize="16" Foreground="White" Margin="0,0,0,10"/>
+                    <ToggleButton x:Name="LoginToggle" Content="Start / Stop"
+                                  Width="120" Height="35"
+                                  Background="#3A8DFF" Foreground="White"
+                                  Click="ServerToggle_Click"/>
+                    <TextBlock x:Name="LoginStatus" Text="Status: Offline"
+                               Foreground="Gray" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#2D2D40" CornerRadius="12" Padding="20" Margin="10" Width="200" Height="130">
+                <StackPanel>
+                    <TextBlock Text="Game Server" FontSize="16" Foreground="White" Margin="0,0,0,10"/>
+                    <ToggleButton x:Name="GameToggle" Content="Start / Stop"
+                                  Width="120" Height="35"
+                                  Background="#3A8DFF" Foreground="White"
+                                  Click="ServerToggle_Click"/>
+                    <TextBlock x:Name="GameStatus" Text="Status: Offline"
+                               Foreground="Gray" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#2D2D40" CornerRadius="12" Padding="20" Margin="10" Width="200" Height="130">
+                <StackPanel>
+                    <TextBlock Text="Rank Server" FontSize="16" Foreground="White" Margin="0,0,0,10"/>
+                    <ToggleButton x:Name="RankToggle" Content="Start / Stop"
+                                  Width="120" Height="35"
+                                  Background="#3A8DFF" Foreground="White"
+                                  Click="ServerToggle_Click"/>
+                    <TextBlock x:Name="RankStatus" Text="Status: Offline"
+                               Foreground="Gray" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#2D2D40" CornerRadius="12" Padding="20" Margin="10" Width="200" Height="130">
+                <StackPanel>
+                    <TextBlock Text="Messenger Server" FontSize="16" Foreground="White" Margin="0,0,0,10"/>
+                    <ToggleButton x:Name="MessengerToggle" Content="Start / Stop"
+                                  Width="120" Height="35"
+                                  Background="#3A8DFF" Foreground="White"
+                                  Click="ServerToggle_Click"/>
+                    <TextBlock x:Name="MessengerStatus" Text="Status: Offline"
+                               Foreground="Gray" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+
+        <!-- Display dos Servidores -->
+        <TabControl Grid.Row="3" Background="#2D2D40" Foreground="White" Margin="0,5,0,56">
+            <TabItem Header="Auth Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E2F">
+
+                    <RichTextBox x:Name="AuthLog" 
+                     IsReadOnly="True"
+                     Background="#1E1E2F" 
+                     FontFamily="Consolas" FontSize="13" 
+                     BorderThickness="0"
+                     VerticalScrollBarVisibility="Auto" Height="259"/>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Repetir para Login, Game, Rank, Messenger -->
+            <TabItem Header="Login Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E2F">
+                    <RichTextBox x:Name="LoginLog" 
+                     IsReadOnly="True"
+                     Background="#1E1E2F" 
+                     FontFamily="Consolas" FontSize="13" 
+                     BorderThickness="0"
+                     VerticalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Game Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E2F">
+                    <RichTextBox x:Name="GameLog"  
+                     IsReadOnly="True"
+                     Background="#1E1E2F" 
+                     FontFamily="Consolas" FontSize="13" 
+                     BorderThickness="0"
+                     VerticalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Rank Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E2F">
+                    <RichTextBox x:Name="RankLog" 
+                     IsReadOnly="True"
+                     Background="#1E1E2F" 
+                     FontFamily="Consolas" FontSize="13" 
+                     BorderThickness="0"
+                     VerticalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Messenger Server">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Background="#1E1E2F">
+                    <RichTextBox x:Name="MessengerLog"  
+                     IsReadOnly="True"
+                     Background="#1E1E2F" 
+                     FontFamily="Consolas" FontSize="13" 
+                     BorderThickness="0"
+                     VerticalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- Botões Globais -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,6">
+            <Button Content="Start All" Width="150" Height="45"
+                    Background="#28A745" Foreground="White" FontWeight="Bold"
+                    Margin="10" Click="StartAll_Click"/>
+            <Button Content="Stop All" Width="150" Height="45"
+                    Background="#DC3545" Foreground="White" FontWeight="Bold"
+                    Margin="10" Click="StopAll_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
