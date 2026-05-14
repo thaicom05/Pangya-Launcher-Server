@@ -1,247 +1,272 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Documents;
-using System.Windows.Media;
+using System.Windows.Threading;
+using Microsoft.Win32;
+using PangyaLauncherServer.Database;
+using PangyaLauncherServer.Helpers;
+using PangyaLauncherServer.Models;
+using PangyaLauncherServer.Services;
 
 namespace PangyaLauncherServer
-{ 
+{
     public partial class MainWindow : Window
     {
-        private readonly Dictionary<string, Process> serverProcesses = new();
-        private List<ServerProcessInfo> serversConfig;
-        private readonly string exeDir = AppContext.BaseDirectory;
+        // ------------------------------------------------------------------ //
+        //  Infrastructure                                                      //
+        // ------------------------------------------------------------------ //
 
-        // FLAG para evitar loop de eventos ao mudar IsChecked
-        private bool isChangingToggle = false; 
+        private readonly DatabaseService _db;
+        private readonly ServerManager   _manager;
+        private readonly DispatcherTimer _watchdogTimer;
+        private readonly DispatcherTimer _uptimeTimer;
+
+        // Prevents toggle click feedback loops
+        private bool _suspendToggle;
+
+        // ------------------------------------------------------------------ //
+        //  Construction                                                        //
+        // ------------------------------------------------------------------ //
+
         public MainWindow()
         {
             InitializeComponent();
-            LoadServerConfig();
-        }
 
+            // 1. Database
+            string dbPath = Path.Combine(AppContext.BaseDirectory, "launcher.db");
+            _db = new DatabaseService(dbPath);
 
-        public int ExeCheaker(string name)
-        {
-            Process[] myProcesses;
-            myProcesses = Process.GetProcessesByName(name);
-            foreach (Process myProcess in myProcesses)
-            {
-                return 1;
-            }
+            // 2. Server manager
+            _manager = new ServerManager(_db);
+            _manager.LogReceived    += OnLogReceived;
+            _manager.StatusChanged  += OnStatusChanged;
+            _manager.StatsUpdated   += OnStatsUpdated;
 
-            return 0;
+            // 3. Load XML config
+            string xmlPath = Path.Combine(AppContext.BaseDirectory, "startup.xml");
+            ServerConfiguration.GenerateDefault(xmlPath);
 
-        }
-         
-        public void ProssKill(string kill)
-        {
-            Process[] myProcesses;
-            myProcesses = Process.GetProcessesByName(kill);
-            foreach (Process myProcess in myProcesses)
-            {
-                myProcess.Kill();
-            }
-        }
-
-        private void LoadServerConfig()
-        {
             try
             {
-                serversConfig = ServerConfig.LoadProcesses("startup.xml"); // você precisa do método LoadProcesses
-                foreach (var server in serversConfig)
+                var entries = ServerConfiguration.Load(xmlPath);
+                _manager.LoadConfiguration(entries);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Config load error:\n{ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // 4. Watchdog timer — runs every 5 seconds
+            _watchdogTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            _watchdogTimer.Tick += (_, _) => _manager.RunWatchdog();
+            _watchdogTimer.Start();
+
+            // 5. Uptime refresh timer — every second
+            _uptimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _uptimeTimer.Tick += (_, _) => RefreshUptimeLabels();
+            _uptimeTimer.Start();
+
+            // 6. Auto-start servers flagged AutoRun
+            Loaded += async (_, _) => await AutoStartServersAsync();
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Auto-start                                                          //
+        // ------------------------------------------------------------------ //
+
+        private async Task AutoStartServersAsync()
+        {
+            foreach (var entry in _manager.Configuration.Values.Where(e => e.AutoRun))
+                await _manager.StartAsync(entry.Name);
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Event: log line received from ServerManager                        //
+        // ------------------------------------------------------------------ //
+
+        private void OnLogReceived(LogEntry entry)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                var rtb = FindName(entry.ServerName + "Log") as RichTextBox;
+                if (rtb != null)
+                    UiHelper.AppendLog(rtb, entry);
+            });
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Event: server status changed                                       //
+        // ------------------------------------------------------------------ //
+
+        private void OnStatusChanged(string name, ServerStatus status)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                // Status label
+                var statusBlock = FindName(name + "Status") as System.Windows.Controls.TextBlock;
+                if (statusBlock != null)
                 {
-                    var toggle = FindName(server.Name + "Toggle") as ToggleButton;
-                    var logBox = FindName(server.Name + "Log") as RichTextBox;
+                    statusBlock.Text       = UiHelper.StatusToLabel(status);
+                    statusBlock.Foreground = UiHelper.StatusToBrush(status);
+                }
 
-                    string fullPath = Path.Combine(exeDir, server.Path); 
-                    if (!File.Exists(fullPath))
+                // Toggle button
+                var toggle = FindName(name + "Toggle") as ToggleButton;
+                if (toggle != null)
+                {
+                    _suspendToggle = true;
+                    toggle.IsChecked = status == ServerStatus.Online ||
+                                       status == ServerStatus.Starting ||
+                                       status == ServerStatus.Restarting;
+                    _suspendToggle = false;
+                }
+            });
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Event: stats updated                                               //
+        // ------------------------------------------------------------------ //
+
+        private void OnStatsUpdated(string name, ServerStats stats)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                var crashLabel = FindName(name + "Crashes") as System.Windows.Controls.TextBlock;
+                if (crashLabel != null)
+                    crashLabel.Text = $"Crashes: {stats.TotalCrashes}  Restarts: {stats.TotalRestarts}";
+            });
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Uptime refresh                                                     //
+        // ------------------------------------------------------------------ //
+
+        private void RefreshUptimeLabels()
+        {
+            foreach (var entry in _manager.Configuration.Values)
+            {
+                var lbl = FindName(entry.Name + "Uptime") as System.Windows.Controls.TextBlock;
+                if (lbl != null)
+                    lbl.Text = $"Up: {UiHelper.FormatUptime(entry.Uptime)}";
+            }
+        }
+
+        // ------------------------------------------------------------------ //
+        //  UI Event Handlers                                                   //
+        // ------------------------------------------------------------------ //
+
+        private async void ServerToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_suspendToggle) return;
+
+            if (sender is ToggleButton toggle)
+            {
+                string name = toggle.Name.Replace("Toggle", "");
+                if (_manager.Configuration.ContainsKey(name))
+                {
+                    toggle.IsEnabled = false;
+                    try
                     {
-                        AppendText(logBox, $"[WARN] Binário não encontrado: {fullPath}\n", Brushes.OrangeRed);
-                        toggle.IsEnabled = false;
+                        if (toggle.IsChecked == true)
+                            await _manager.StartAsync(name);
+                        else
+                            _manager.Stop(name);
                     }
-                    else
+                    finally
                     {
-                        ProssKill(server.Name+"Server");
-                        ProssKill(server.Name);
-
-                        Thread.Sleep(300);
                         toggle.IsEnabled = true;
                     }
                 }
             }
-            catch (Exception ex)
+        }
+
+        private async void StartAll_Click(object sender, RoutedEventArgs e)
+        {
+            BtnStartAll.IsEnabled = false;
+            try   { await _manager.StartAllAsync(); }
+            finally { BtnStartAll.IsEnabled = true; }
+        }
+
+        private void StopAll_Click(object sender, RoutedEventArgs e) =>
+            _manager.StopAll();
+
+        private async void RestartAll_Click(object sender, RoutedEventArgs e)
+        {
+            BtnRestartAll.IsEnabled = false;
+            try   { await _manager.RestartAllAsync(); }
+            finally { BtnRestartAll.IsEnabled = true; }
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Log Tools                                                           //
+        // ------------------------------------------------------------------ //
+
+        private void ClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            // Clear the active tab's log box
+            if (ServerTabControl.SelectedItem is TabItem tab)
             {
-                MessageBox.Show($"Erro ao carregar XML: {ex.Message}");
+                var rtb = ((tab.Content as ScrollViewer)?.Content) as RichTextBox;
+                if (rtb != null) UiHelper.ClearLog(rtb);
             }
         }
 
-        private void ServerToggle_Click(object sender, RoutedEventArgs e)
+        private void ExportLog_Click(object sender, RoutedEventArgs e)
         {
-            if (isChangingToggle) return;
-
-            if (sender is ToggleButton toggle)
+            if (ServerTabControl.SelectedItem is TabItem tab)
             {
-                string serverName = toggle.Name.Replace("Toggle", "");
-                var server = serversConfig.Find(s => s.Name == serverName);
-                var logBox = FindName(serverName + "Log") as RichTextBox;
-
-                if (serverProcesses.ContainsKey(serverName))
-                    StopServer(serverName, toggle, logBox);
-                else if (server != null)
-                {
-
-                    UpdateStatus(server.Name, "Iniciando...", Brushes.LightBlue); 
-                    StartServer(server, toggle, logBox);
-                }
+                string name      = tab.Header?.ToString()?.Replace(" Server", "") ?? "Unknown";
+                string outputDir = Path.Combine(AppContext.BaseDirectory, "logs");
+                string path      = LogExportService.ExportToCsv(_db, name, outputDir);
+                MessageBox.Show($"Log exported to:\n{path}", "Export Complete",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
-        private async void StartServer(ServerProcessInfo server, ToggleButton toggle, RichTextBox logBox)
+        private void ExportStats_Click(object sender, RoutedEventArgs e)
         {
-            await Task.Delay(server.Delay);
+            string outputDir = Path.Combine(AppContext.BaseDirectory, "logs");
+            string path      = LogExportService.ExportStats(_db, outputDir);
+            MessageBox.Show($"Stats exported to:\n{path}", "Export Complete",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
 
-            string fullPath = Path.Combine(exeDir, server.Path);
-            if (!File.Exists(fullPath))
+        private void PurgeLogs_Click(object sender, RoutedEventArgs e)
+        {
+            if (MessageBox.Show("Delete logs older than 30 days?", "Confirm Purge",
+                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
             {
-                AppendText(logBox, $"[ERROR] Binário não encontrado: {fullPath}\n", Brushes.OrangeRed);
+                int n = _db.PurgeLogs(30);
+                MessageBox.Show($"{n} log entries deleted.", "Purge Complete",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        // ------------------------------------------------------------------ //
+        //  Window closing                                                      //
+        // ------------------------------------------------------------------ //
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (MessageBox.Show("Stop all servers and exit?", "Confirm Exit",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+            {
+                e.Cancel = true;
                 return;
             }
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = fullPath,
-                Arguments = server.Parameters,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = Path.GetDirectoryName(fullPath)
-            };
-
-            var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-
-            process.OutputDataReceived += (s, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
-                    AppendText(logBox, e.Data + "\n", Brushes.LightGreen);
-            };
-
-            process.ErrorDataReceived += (s, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
-                    AppendText(logBox, "[ERROR] " + e.Data + "\n", Brushes.OrangeRed);
-            };
-
-            process.Exited += (s, e) =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    isChangingToggle = true;
-                    AppendText(logBox, $"[{server.Name}] Processo encerrado.\n", Brushes.Gray);
-                    toggle.IsChecked = false;
-                    isChangingToggle = false;
-                    serverProcesses.Remove(server.Name);
-                });
-            };
-
-            try
-            {
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                serverProcesses[server.Name] = process;
-
-                isChangingToggle = true;
-                toggle.IsChecked = true;
-                isChangingToggle = false;
-
-                AppendText(logBox, $"[{server.Name}] Processo iniciado.\n", Brushes.LightBlue);
-                UpdateStatus(server.Name, "Online", Brushes.LightGreen); 
-            }
-            catch (Exception ex)
-            {
-                UpdateStatus(server.Name, "Falhou", Brushes.Red);
-
-                AppendText(logBox, $"[ERROR] Falha ao iniciar {server.Name}: {ex.Message}\n", Brushes.OrangeRed);
-            }
+            _watchdogTimer.Stop();
+            _uptimeTimer.Stop();
+            _manager.Dispose();
+            _db.Dispose();
+            base.OnClosing(e);
         }
-
-        private void StopServer(string serverName, ToggleButton toggle, RichTextBox logBox)
-        {
-            if (serverProcesses.TryGetValue(serverName, out var process))
-            {
-                try
-                {
-                    process.Kill(true);
-                    UpdateStatus(serverName, "Offline", Brushes.Gray);
-
-                    AppendText(logBox, $"[{serverName}] Processo finalizado manualmente.\n", Brushes.Gray);
-                }
-                catch (Exception ex)
-                {
-                    AppendText(logBox, $"[ERROR] Erro ao finalizar {serverName}: {ex.Message}\n", Brushes.OrangeRed);
-                }
-                finally
-                {
-                    serverProcesses.Remove(serverName);
-
-                    isChangingToggle = true;
-                    toggle.IsChecked = false;
-                    isChangingToggle = false;
-                }
-            }
-        }
-
-        private void StartAll_Click(object sender, RoutedEventArgs e)
-        {
-            foreach (var server in serversConfig)
-            {
-                var toggle = FindName(server.Name + "Toggle") as ToggleButton;
-                var logBox = FindName(server.Name + "Log") as RichTextBox;
-                if (toggle != null && logBox != null && toggle.IsEnabled && !(toggle.IsChecked ?? false))
-                    StartServer(server, toggle, logBox);
-            }
-        }
-
-        private void StopAll_Click(object sender, RoutedEventArgs e)
-        {
-            foreach (var serverName in serverProcesses.Keys.ToList())
-            {
-                var toggle = FindName(serverName + "Toggle") as ToggleButton;
-                var logBox = FindName(serverName + "Log") as RichTextBox;
-                StopServer(serverName, toggle, logBox);
-            }
-        }
-
-        private void AppendText(RichTextBox rtb, string text, Brush color)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                var range = new TextRange(rtb.Document.ContentEnd, rtb.Document.ContentEnd)
-                {
-                    Text = text
-                };
-                range.ApplyPropertyValue(TextElement.ForegroundProperty, color);
-                rtb.ScrollToEnd();
-            });
-        }
-        private void UpdateStatus(string serverName, string status, Brush color)
-        {
-            var statusBlock = FindName(serverName + "Status") as TextBlock;
-            if (statusBlock != null)
-            {
-                statusBlock.Text = $"Status: {status}";
-                statusBlock.Foreground = color;
-            }
-        }
-
     }
 }

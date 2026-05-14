@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pangya Launcher Server — Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg0:      #080810;
+    --bg1:      #0e0e1c;
+    --bg2:      #14142a;
+    --bg3:      #1c1c38;
+    --card:     #181830;
+    --border:   #2a2a50;
+    --blue:     #3a8dff;
+    --blue2:    #1a5acc;
+    --green:    #00e676;
+    --green2:   #00a152;
+    --red:      #ff3d3d;
+    --amber:    #ffb300;
+    --cyan:     #00e5ff;
+    --purple:   #b388ff;
+    --txt:      #ddddf0;
+    --txt2:     #8888aa;
+    --txt3:     #4444668;
+    --online:   #00e676;
+    --offline:  #555577;
+    --crash:    #ff3d3d;
+    --restart:  #ffb300;
+  }
+
+  html, body {
+    background: var(--bg0);
+    color: var(--txt);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(58,141,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(58,141,255,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app-wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 30px auto;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(58,141,255,.12), 0 0 120px rgba(0,0,0,.8);
+  }
+
+  /* ── TITLEBAR ── */
+  .titlebar {
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    height: 48px;
+    gap: 12px;
+    position: relative;
+  }
+
+  .titlebar-dots { display: flex; gap: 6px; }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    transition: filter .2s;
+  }
+  .dot:hover { filter: brightness(1.4); cursor: pointer; }
+  .dot.red    { background: #ff5f57; }
+  .dot.amber  { background: #febc2e; }
+  .dot.green  { background: #28c840; }
+
+  .titlebar-title {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px; font-weight: 700;
+    color: var(--txt2);
+    letter-spacing: .15em;
+  }
+
+  .titlebar-title span { color: var(--blue); }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(180deg, #0a0a18 0%, var(--bg1) 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--blue), #6644ff);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 16px rgba(58,141,255,.4);
+  }
+
+  .logo-text {
+    display: flex; flex-direction: column;
+  }
+
+  .logo-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px; font-weight: 900;
+    color: white;
+    letter-spacing: .08em;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-size: 10px; color: var(--txt2);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+  }
+
+  .header-actions { display: flex; gap: 8px; }
+
+  .btn {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px; font-weight: 700;
+    border: none; border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    transition: filter .15s, transform .1s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+
+  .btn-start   { background: var(--green2);   color: #fff; }
+  .btn-restart { background: #c47d00;          color: #fff; }
+  .btn-stop    { background: #9a1020;          color: #fff; }
+
+  /* ── CARDS ROW ── */
+  .cards-row {
+    display: flex;
+    gap: 0;
+    background: var(--bg1);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 16px 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cards-row::-webkit-scrollbar { display: none; }
+
+  .server-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 185px;
+    flex: 1;
+    margin: 0 6px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .25s;
+  }
+  .server-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--card-accent, transparent);
+    transition: background .4s;
+  }
+  .server-card.online  { border-color: rgba(0,230,118,.25); }
+  .server-card.online::before  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .server-card.offline::before { background: #333355; }
+  .server-card.crash::before   { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .server-card.restart::before { background: var(--amber); animation: pulse-amber 1s infinite; }
+
+  @keyframes pulse-amber {
+    0%,100% { opacity: 1; } 50% { opacity: .4; }
+  }
+
+  .card-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px; font-weight: 700;
+    color: white;
+    letter-spacing: .04em;
+    margin-bottom: 10px;
+  }
+
+  .card-toggle {
+    width: 100%;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 700;
+    border: none; border-radius: 5px;
+    padding: 7px 0;
+    cursor: pointer;
+    letter-spacing: .06em;
+    transition: all .2s;
+  }
+  .card-toggle.on  { background: var(--green2); color: #fff; }
+  .card-toggle.off { background: #2a2a50; color: var(--txt2); }
+  .card-toggle.on:hover  { background: #00c853; }
+  .card-toggle.off:hover { background: #3a3a60; }
+
+  .card-status {
+    font-size: 11px; margin-top: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+  .status-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse-green .8s infinite; }
+  .status-dot.offline { background: #444466; }
+  .status-dot.crash   { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red .5s infinite; }
+  .status-dot.restart { background: var(--amber); animation: pulse-amber .6s infinite; }
+
+  @keyframes pulse-green {
+    0%,100% { box-shadow: 0 0 4px var(--green); }
+    50%      { box-shadow: 0 0 10px var(--green); }
+  }
+  @keyframes pulse-red {
+    0%,100% { box-shadow: 0 0 4px var(--red); }
+    50%      { box-shadow: 0 0 10px var(--red); }
+  }
+
+  .card-uptime {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; color: #5566aa;
+    margin-top: 4px;
+  }
+
+  .card-meta {
+    font-size: 10px; color: #3a3a60;
+    margin-top: 3px;
+  }
+
+  /* ── LOG AREA ── */
+  .log-area {
+    background: var(--bg1);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tabs {
+    display: flex;
+    background: var(--bg0);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: .06em;
+    padding: 10px 20px;
+    color: var(--txt2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color .2s, border-color .2s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--txt); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+  .tab .tab-dot {
+    display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+    background: #444;
+  }
+  .tab.online .tab-dot  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .tab.crash  .tab-dot  { background: var(--red); }
+
+  .log-console {
+    background: var(--bg0);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11.5px;
+    padding: 12px 16px;
+    height: 230px;
+    overflow-y: auto;
+    line-height: 1.7;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a50 transparent;
+  }
+  .log-console::-webkit-scrollbar       { width: 5px; }
+  .log-console::-webkit-scrollbar-track { background: transparent; }
+  .log-console::-webkit-scrollbar-thumb { background: #2a2a50; border-radius: 4px; }
+
+  .log-line { display: flex; gap: 8px; }
+  .log-ts   { color: #3a3a5c; min-width: 70px; }
+  .log-lvl  { min-width: 42px; font-weight: bold; }
+  .log-svc  { color: #6666aa; min-width: 80px; }
+  .log-msg  { color: #b0b0cc; flex: 1; }
+
+  .lvl-info  { color: #4488ff; }
+  .lvl-event { color: #00aaff; }
+  .lvl-warn  { color: #ffb300; }
+  .lvl-error { color: #ff4444; }
+  .lvl-ok    { color: #00e676; }
+
+  /* ── FOOTER TOOLBAR ── */
+  .footer {
+    background: var(--bg0);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 8px;
+  }
+
+  .tool-btn {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px; font-weight: 700;
+    background: #1a1a32;
+    border: 1px solid #2a2a48;
+    border-radius: 5px;
+    color: var(--txt2);
+    padding: 6px 12px;
+    cursor: pointer;
+    letter-spacing: .05em;
+    transition: all .2s;
+  }
+  .tool-btn:hover { background: #22224a; color: var(--txt); border-color: #4444aa; }
+
+  .footer-version {
+    margin-left: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #28284a;
+  }
+
+  /* ── STATUS BAR ── */
+  .statusbar {
+    background: #060610;
+    border-top: 1px solid #1a1a30;
+    display: flex;
+    align-items: center;
+    padding: 4px 16px;
+    gap: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #3a3a5a;
+  }
+  .statusbar-item span { color: #5566aa; }
+
+  /* ── DB indicator ── */
+  .db-pill {
+    display: flex; align-items: center; gap: 5px;
+    background: #0e1428;
+    border: 1px solid #1a2a50;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #4477cc;
+  }
+  .db-pill-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); animation: pulse-green 1.5s infinite; }
+
+  /* ── Animated typing cursor in log ── */
+  .cursor-blink {
+    display: inline-block;
+    width: 7px; height: 12px;
+    background: var(--blue);
+    vertical-align: middle;
+    animation: blink .9s infinite;
+    margin-left: 2px;
+  }
+  @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+
+  /* scrollbar for whole page */
+  ::-webkit-scrollbar       { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e1e3a; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div style="text-align:center; padding: 20px 0 8px; font-family:'Orbitron',monospace; font-size:11px; color:#3a3a5c; letter-spacing:.2em; text-transform:uppercase;">
+  Pangya Launcher Server — Interactive Preview
+</div>
+
+<div class="app-wrap">
+
+  <!-- TITLEBAR -->
+  <div class="titlebar">
+    <div class="titlebar-dots">
+      <div class="dot red"></div>
+      <div class="dot amber"></div>
+      <div class="dot green"></div>
+    </div>
+    <div class="titlebar-title">PANGYA <span>LAUNCHER SERVER</span> — v2.0</div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">⛳</div>
+      <div class="logo-text">
+        <div class="logo-title">PANGYA</div>
+        <div class="logo-sub">Launcher Server</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div class="db-pill">
+        <div class="db-pill-dot"></div>
+        launcher.db · WAL
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-start"   onclick="startAll()">▶ Start All</button>
+        <button class="btn btn-restart" onclick="restartAll()">↻ Restart All</button>
+        <button class="btn btn-stop"    onclick="stopAll()">■ Stop All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVER CARDS -->
+  <div class="cards-row" id="cardsRow"></div>
+
+  <!-- TABS + LOG -->
+  <div class="log-area">
+    <div class="tabs" id="tabs"></div>
+    <div class="log-console" id="logConsole"></div>
+  </div>
+
+  <!-- FOOTER TOOLBAR -->
+  <div class="footer">
+    <button class="tool-btn" onclick="clearLog()">🗑  Clear Log</button>
+    <button class="tool-btn" onclick="fakeExport()">📄  Export CSV</button>
+    <button class="tool-btn" onclick="fakeStats()">📊  Export Stats</button>
+    <button class="tool-btn" onclick="fakePurge()">🧹  Purge Old Logs</button>
+    <div class="footer-version">Pangya Launcher Server  |  v2.0  |  .NET 10 WPF</div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <div class="statusbar-item">ONLINE: <span id="sbOnline">0</span></div>
+    <div class="statusbar-item">CRASHES: <span id="sbCrashes">0</span></div>
+    <div class="statusbar-item">DB LOGS: <span id="sbLogs">0</span></div>
+    <div class="statusbar-item">WATCHDOG: <span style="color:#00e676">ACTIVE ✓</span></div>
+    <div class="statusbar-item" id="sbTime" style="margin-left:auto;"></div>
+  </div>
+
+</div>
+
+<div style="text-align:center; padding: 12px 0 24px; font-family:'Share Tech Mono',monospace; font-size:10px; color:#2a2a40;">
+  Este preview é interativo — clique nos botões para simular o comportamento real
+</div>
+
+<script>
+// ── State ──
+const SERVERS = [
+  { name: 'Auth',      label: 'Auth Server',      delay: 0    },
+  { name: 'Login',     label: 'Login Server',     delay: 400  },
+  { name: 'Game',      label: 'Game Server',      delay: 900  },
+  { name: 'Rank',      label: 'Rank Server',      delay: 1400 },
+  { name: 'Messenger', label: 'Messenger Server', delay: 1900 },
+];
+
+const state = {};
+SERVERS.forEach(s => {
+  state[s.name] = { status: 'offline', uptime: 0, crashes: 0, restarts: 0, pid: null, timer: null };
+});
+
+let activeTab  = 'Auth';
+let dbLogs     = 0;
+let totalCrash = 0;
+
+// ── Build DOM ──
+function buildCards() {
+  const row = document.getElementById('cardsRow');
+  row.innerHTML = '';
+  SERVERS.forEach(s => {
+    const st = state[s.name];
+    const statusClass = st.status === 'online' ? 'online' : st.status === 'crash' ? 'crash' : st.status === 'restart' ? 'restart' : 'offline';
+    const toggleClass = st.status === 'online' ? 'on' : 'off';
+    const statusLabel = { online:'● Online', offline:'○ Offline', crash:'✖ Crashed', starting:'◌ Starting...', restart:'↻ Restarting...' }[st.status] || '○ Offline';
+    const statusColor = { online:'#00e676', offline:'#555577', crash:'#ff4444', starting:'#4488ff', restart:'#ffb300' }[st.status] || '#555577';
+
+    row.innerHTML += `
+      <div class="server-card ${statusClass}" id="card-${s.name}">
+        <div class="card-name">${s.label}</div>
+        <button class="card-toggle ${toggleClass}" onclick="toggleServer('${s.name}')" id="tog-${s.name}">
+          ${st.status === 'online' ? 'STOP' : 'START'}
+        </button>
+        <div class="card-status">
+          <div class="status-dot ${statusClass}" id="dot-${s.name}"></div>
+          <span style="color:${statusColor}" id="lbl-${s.name}">${statusLabel}</span>
+        </div>
+        <div class="card-uptime" id="up-${s.name}">Up: ${formatUptime(st.uptime)}</div>
+        <div class="card-meta" id="meta-${s.name}">Crashes: ${st.crashes} &nbsp; Restarts: ${st.restarts}</div>
+      </div>`;
+  });
+}
+
+function buildTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  SERVERS.forEach(s => {
+    const st    = state[s.name];
+    const cls   = activeTab === s.name ? 'active' : '';
+    const stype = st.status === 'online' ? 'online' : st.status === 'crash' ? 'crash' : '';
+    tabs.innerHTML += `<div class="tab ${cls} ${stype}" onclick="switchTab('${s.name}')">
+      <span class="tab-dot"></span>${s.label}
+    </div>`;
+  });
+}
+
+// ── Tabs ──
+const logBuffers = {};
+SERVERS.forEach(s => { logBuffers[s.name] = []; });
+
+function switchTab(name) {
+  activeTab = name;
+  buildTabs();
+  renderLog();
+}
+
+function renderLog() {
+  const console = document.getElementById('logConsole');
+  const lines   = logBuffers[activeTab] || [];
+  console.innerHTML = lines.map(l => `
+    <div class="log-line">
+      <span class="log-ts">${l.ts}</span>
+      <span class="log-lvl ${l.lvlClass}">[${l.lvl}]</span>
+      <span class="log-svc">[${l.svc}]</span>
+      <span class="log-msg">${l.msg}</span>
+    </div>`).join('') + '<div><span class="cursor-blink"></span></div>';
+  console.scrollTop = console.scrollHeight;
+}
+
+function pushLog(server, lvl, msg) {
+  const now   = new Date();
+  const ts    = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const lvlClass = { INFO:'lvl-info', EVENT:'lvl-event', WARN:'lvl-warn', ERROR:'lvl-error', OK:'lvl-ok' }[lvl] || 'lvl-info';
+
+  if (!logBuffers[server]) logBuffers[server] = [];
+  logBuffers[server].push({ ts, lvl, lvlClass, svc: server, msg });
+  if (logBuffers[server].length > 300) logBuffers[server].shift();
+  dbLogs++;
+
+  if (activeTab === server) renderLog();
+  document.getElementById('sbLogs').textContent = dbLogs;
+}
+
+// ── Server logic ──
+function setStatus(name, status) {
+  state[name].status = status;
+  const s = SERVERS.find(x => x.name === name);
+  const statusLabel = { online:'● Online', offline:'○ Offline', crash:'✖ Crashed', starting:'◌ Starting...', restart:'↻ Restarting...' }[status] || '○ Offline';
+  const statusColor = { online:'#00e676', offline:'#555577', crash:'#ff4444', starting:'#4488ff', restart:'#ffb300' }[status] || '#555577';
+  const statusClass = status === 'online' ? 'online' : status === 'crash' ? 'crash' : status === 'restart' ? 'restart' : 'offline';
+
+  const card = document.getElementById(`card-${name}`);
+  const dot  = document.getElementById(`dot-${name}`);
+  const lbl  = document.getElementById(`lbl-${name}`);
+  const tog  = document.getElementById(`tog-${name}`);
+
+  if (card) { card.className = `server-card ${statusClass}`; }
+  if (dot)  { dot.className = `status-dot ${statusClass}`; }
+  if (lbl)  { lbl.textContent = statusLabel; lbl.style.color = statusColor; }
+  if (tog)  {
+    tog.className = `card-toggle ${status === 'online' ? 'on' : 'off'}`;
+    tog.textContent = status === 'online' ? 'STOP' : 'START';
+  }
+
+  updateStatusBar();
+  buildTabs();
+}
+
+function startServer(name, delay = 0) {
+  setTimeout(() => {
+    setStatus(name, 'starting');
+    pushLog(name, 'EVENT', `Startup delay: ${delay}ms...`);
+    setTimeout(() => {
+      const pid = Math.floor(Math.random() * 30000) + 5000;
+      state[name].pid    = pid;
+      state[name].uptime = 0;
+      setStatus(name, 'online');
+      pushLog(name, 'EVENT', `Process started (PID ${pid})`);
+      pushLog(name, 'INFO',  `Listening on port ${getPort(name)}...`);
+      pushLog(name, 'OK',    `${name} Server ready. Waiting for connections.`);
+
+      // uptime counter
+      if (state[name].timer) clearInterval(state[name].timer);
+      state[name].timer = setInterval(() => {
+        state[name].uptime++;
+        const el = document.getElementById(`up-${name}`);
+        if (el) el.textContent = 'Up: ' + formatUptime(state[name].uptime);
+      }, 1000);
+
+      // random fake log lines
+      startFakeLogs(name);
+
+      // occasionally simulate a crash
+      if (Math.random() < 0.15) {
+        setTimeout(() => simulateCrash(name), Math.random() * 15000 + 8000);
+      }
+    }, 600);
+  }, delay);
+}
+
+function stopServer(name) {
+  if (state[name].timer) { clearInterval(state[name].timer); state[name].timer = null; }
+  if (state[name].fakeTimer) { clearInterval(state[name].fakeTimer); state[name].fakeTimer = null; }
+  setStatus(name, 'offline');
+  state[name].uptime = 0;
+  const el = document.getElementById(`up-${name}`);
+  if (el) el.textContent = 'Up: —';
+  pushLog(name, 'EVENT', `Process stopped manually.`);
+}
+
+function simulateCrash(name) {
+  if (state[name].status !== 'online') return;
+  if (state[name].timer) { clearInterval(state[name].timer); state[name].timer = null; }
+  if (state[name].fakeTimer) { clearInterval(state[name].fakeTimer); state[name].fakeTimer = null; }
+
+  state[name].crashes++;
+  state[name].uptime = 0;
+  totalCrash++;
+
+  setStatus(name, 'crash');
+  pushLog(name, 'ERROR', `Unhandled exception: Access violation at 0x00000000`);
+  pushLog(name, 'ERROR', `Process CRASHED (exit code 0xC0000005). Restart #${state[name].crashes}`);
+  document.getElementById('sbCrashes').textContent = totalCrash;
+  document.getElementById(`meta-${name}`).textContent = `Crashes: ${state[name].crashes}   Restarts: ${state[name].restarts}`;
+
+  // auto restart after back-off
+  const backoff = Math.min(2000 * state[name].crashes, 6000);
+  pushLog(name, 'WARN', `Auto-restart in ${backoff/1000}s... (back-off)`);
+  setStatus(name, 'restart');
+  setTimeout(() => {
+    state[name].restarts++;
+    document.getElementById(`meta-${name}`).textContent = `Crashes: ${state[name].crashes}   Restarts: ${state[name].restarts}`;
+    pushLog(name, 'EVENT', `Auto-restarting process...`);
+    startServer(name, 0);
+  }, backoff);
+}
+
+function toggleServer(name) {
+  if (state[name].status === 'online') {
+    stopServer(name);
+  } else if (state[name].status === 'offline' || state[name].status === 'crash') {
+    startServer(name, 0);
+  }
+}
+
+function startAll() {
+  SERVERS.forEach(s => {
+    if (state[s.name].status === 'offline' || state[s.name].status === 'crash')
+      startServer(s.name, s.delay);
+  });
+}
+
+function stopAll() {
+  SERVERS.forEach(s => {
+    if (state[s.name].status === 'online' || state[s.name].status === 'starting')
+      stopServer(s.name);
+  });
+}
+
+function restartAll() {
+  stopAll();
+  setTimeout(() => startAll(), 1000);
+}
+
+// ── Fake log lines ──
+const fakeMsgs = {
+  Auth:      ['Client connected: 192.168.1.10', 'Auth token validated for UID 10042', 'Session created: token=A3F9...', 'Heartbeat OK (22ms)', 'Client disconnected gracefully'],
+  Login:     ['Login attempt: user=pangya_fan', 'Password verified. Redirecting to game select.', 'Character list loaded (3 chars)', 'Packet 0x0201 received', 'Session timeout — client idle'],
+  Game:      ['Room #4 created by Kooh (4-player)', 'Tee-off: hole 3 / Wiz Wiz', 'Score submitted: -2 (Eagle)', 'Item shop purchase: Caddie_Papel', 'Room #4 closed. Winner: Kooh'],
+  Rank:      ['Ranking recalculated: top-100 updated', 'New entry: Nuri rank #43 (+7)', 'Cache flushed (512 entries)', 'Weekly reset scheduled'],
+  Messenger: ['Friend request: Kooh → Cecilia', 'Message delivered to UID 2201', 'User Nuri went offline', 'Guild chat broadcast sent to 14 members'],
+};
+
+function startFakeLogs(name) {
+  if (state[name].fakeTimer) clearInterval(state[name].fakeTimer);
+  state[name].fakeTimer = setInterval(() => {
+    if (state[name].status !== 'online') return;
+    const msgs = fakeMsgs[name] || ['Processing...'];
+    const msg  = msgs[Math.floor(Math.random() * msgs.length)];
+    pushLog(name, 'INFO', msg);
+  }, Math.random() * 2500 + 800);
+}
+
+// ── Toolbar actions ──
+function clearLog() {
+  logBuffers[activeTab] = [];
+  renderLog();
+}
+
+function fakeExport() {
+  pushLog(activeTab, 'EVENT', `Log exported → logs/log_${activeTab}_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+function fakeStats() {
+  SERVERS.forEach(s => {
+    pushLog(s.name, 'EVENT', `Stats exported to logs/stats_${new Date().toISOString().slice(0,10)}.txt`);
+  });
+}
+
+function fakePurge() {
+  const n = Math.floor(Math.random() * 800) + 100;
+  pushLog(activeTab, 'EVENT', `Purged ${n} log entries older than 30 days from launcher.db`);
+}
+
+// ── Helpers ──
+function formatUptime(secs) {
+  if (!secs) return '—';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h) return `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+  if (m) return `${m}m ${String(s).padStart(2,'0')}s`;
+  return `${s}s`;
+}
+
+function getPort(name) {
+  return { Auth:7997, Login:7998, Game:7999, Rank:8000, Messenger:8001 }[name] || 9000;
+}
+
+function updateStatusBar() {
+  const online = SERVERS.filter(s => state[s.name].status === 'online').length;
+  document.getElementById('sbOnline').textContent = `${online}/${SERVERS.length}`;
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('sbTime').textContent =
+    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+}
+
+// ── Init ──
+buildCards();
+buildTabs();
+renderLog();
+setInterval(updateClock, 1000);
+updateClock();
+
+// Auto-start Auth and Login after a moment
+setTimeout(() => {
+  pushLog('Auth',  'EVENT', 'Launcher initialized. Loading startup.xml...');
+  pushLog('Auth',  'INFO',  'Config loaded: 5 servers, WAL database active.');
+  pushLog('Login', 'INFO',  'Waiting for Auth to come online...');
+  startServer('Auth',  0);
+  startServer('Login', 500);
+  startServer('Game',  1100);
+}, 500);
+</script>
+</body>
+</html>

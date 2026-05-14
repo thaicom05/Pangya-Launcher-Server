@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pangya Launcher Server — startup.xml
+  =====================================
+  Each <Process> element defines one managed server.
+
+  Attributes
+  ----------
+  Name        (required) — must match the x:Name prefix used in MainWindow.xaml
+                           e.g. "Auth" → AuthToggle, AuthLog, AuthStatus, AuthUptime
+  Path        (required) — path to the .exe, relative to the launcher directory
+  Parameters  (optional) — command-line arguments passed to the process
+  Delay       (optional) — milliseconds to wait before starting (default: 0)
+  Run         (optional) — true = auto-start on launcher open (default: false)
+  AutoRestart (optional) — true = auto-restart on crash (default: true)
+  MaxRestarts (optional) — max crash-restart attempts before giving up; 0 = unlimited (default: 3)
+-->
+<Processes>
+
+  <Process
+    Name        = "Auth"
+    Path        = "servers\AuthServer.exe"
+    Parameters  = ""
+    Delay       = "0"
+    Run         = "true"
+    AutoRestart = "true"
+    MaxRestarts = "5" />
+
+  <Process
+    Name        = "Login"
+    Path        = "servers\LoginServer.exe"
+    Parameters  = ""
+    Delay       = "500"
+    Run         = "true"
+    AutoRestart = "true"
+    MaxRestarts = "5" />
+
+  <Process
+    Name        = "Game"
+    Path        = "servers\GameServer.exe"
+    Parameters  = ""
+    Delay       = "1000"
+    Run         = "true"
+    AutoRestart = "true"
+    MaxRestarts = "5" />
+
+  <Process
+    Name        = "Rank"
+    Path        = "servers\RankServer.exe"
+    Parameters  = ""
+    Delay       = "1500"
+    Run         = "false"
+    AutoRestart = "true"
+    MaxRestarts = "3" />
+
+  <Process
+    Name        = "Messenger"
+    Path        = "servers\MessengerServer.exe"
+    Parameters  = ""
+    Delay       = "2000"
+    Run         = "false"
+    AutoRestart = "true"
+    MaxRestarts = "3" />
+
+</Processes>
